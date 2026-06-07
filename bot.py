@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.enums import ChatType, ChatMemberStatus
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -17,10 +16,8 @@ BOT_TOKEN = "8931408596:AAH-7SkyKtohZqKPE8ixyEfCV04h_rXagc8"
 OWNER_ID = 8722144519
 BOT_USERNAME = "ll_SUPRRME_XD_ll_BOT"
 
-#=============== CUSTOM LINES (EMPTY - ADD YOUR OWN) ================
+#=============== CUSTOM LINES (EMPTY - WILL LOAD FROM FILE) ================
 CUSTOM_LINES = [
-    # Add your custom lines here
-
     "🔥 teri mummy ki chut!",
     "⚡ bahen k lode teri dadi ki black hairy pussy",
     "🚀 teri mummy ko ulta ltkakr taangduga aur uski chut maruga!",
@@ -135,13 +132,9 @@ CUSTOM_LINES = [
     "𝑻𝑬𝑹𝑬 𝑫𝑨𝑫𝑨 𝑲𝑨 𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺 𝑳𝑰𝑽𝑬 𝑲𝑨𝑹 𝑫𝑼𝑵𝑮𝑨",
     "𝑻𝑬𝑹𝑬 𝑫𝑨𝑫𝑨 𝑲𝑶 𝒁𝑰𝑷 𝑭𝑰𝑳𝑬 𝑴𝑬 𝑪𝑶𝑴𝑷𝑹𝑬𝑺𝑺 𝑲𝑨𝑹 𝑫𝑼𝑵𝑮𝑨",
     "𝑻𝑬𝑹𝑬 𝑫𝑨𝑫𝑨 𝑲𝑬 𝑩𝑯𝑶𝑺𝑫𝑬 𝑴𝑬 𝑷𝒀𝑻𝑯𝑶𝑵 𝑹𝑼𝑵 𝑲𝑨𝑹 𝑫𝑼𝑵𝑮𝑨",
-    "TERI MAA KI CHUT RANDI KE PILE",
-    
-
 ]
 
 # =============== DUMMY SERVER FOR RENDER ================
-
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -151,14 +144,11 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-
 def run_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), Handler)
     server.serve_forever()
 
-
-# Start server thread for Render
 threading.Thread(target=run_server, daemon=True).start()
 
 app = Client(
@@ -170,39 +160,65 @@ app = Client(
 
 #=============== DATA STORAGE ================
 sudo_users = {OWNER_ID}
-muted_users = set()
 spam_active = False
-spam_target = None
-spam_count = 0
-custom_stickers = []
-
-# Variables for custom lines spam
 custom_spam_active = False
 custom_spam_task = None
 
-#=============== LOAD DATA ================
-def load_data():
-    global sudo_users, custom_stickers
+#=============== FILE PATHS ================
+SUDO_FILE = "sudo_users.json"
+LINES_FILE = "custom_lines.json"
 
+#=============== DATA PERSISTENCE FUNCTIONS ================
+
+def load_all_data():
+    global sudo_users, CUSTOM_LINES
+    
+    print("\n📂 LOADING SAVED DATA...")
+    
     try:
-        if os.path.exists("sudo_users.json"):
-            with open("sudo_users.json", "r") as f:
-                sudo_users = set(json.load(f))
-
-        if os.path.exists("custom_stickers.json"):
-            with open("custom_stickers.json", "r") as f:
-                custom_stickers = json.load(f)
-
+        if os.path.exists(SUDO_FILE):
+            with open(SUDO_FILE, "r") as f:
+                loaded_sudo = json.load(f)
+                if loaded_sudo:
+                    sudo_users = set(loaded_sudo)
+                    print(f"✅ Loaded {len(sudo_users)} sudo users")
     except Exception as e:
-        print(f"Error loading data: {e}")
+        print(f"⚠️ Error loading sudo users: {e}")
+    
+    try:
+        if os.path.exists(LINES_FILE):
+            with open(LINES_FILE, "r", encoding='utf-8') as f:
+                loaded_lines = json.load(f)
+                if loaded_lines:
+                    CUSTOM_LINES = loaded_lines
+                    print(f"✅ Loaded {len(CUSTOM_LINES)} custom lines")
+    except Exception as e:
+        print(f"⚠️ Error loading custom lines: {e}")
+    
+    print("✅ DATA LOADING COMPLETE!\n")
 
+def save_sudo_users():
+    try:
+        with open(SUDO_FILE, "w") as f:
+            json.dump(list(sudo_users), f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving sudo users: {e}")
+        return False
 
-def save_data():
-    with open("sudo_users.json", "w") as f:
-        json.dump(list(sudo_users), f)
+def save_custom_lines():
+    try:
+        with open(LINES_FILE, "w", encoding='utf-8') as f:
+            json.dump(CUSTOM_LINES, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving custom lines: {e}")
+        return False
 
-    with open("custom_stickers.json", "w") as f:
-        json.dump(custom_stickers, f)
+def save_all_data():
+    save_sudo_users()
+    save_custom_lines()
+    print("💾 All data saved!")
 
 #=============== BUTTONS ================
 def get_main_keyboard():
@@ -222,95 +238,109 @@ async def custom_spam_loop(client, chat_id, target_user_id, count):
     target_user = await client.get_users(target_user_id)
     mention = target_user.mention
     
-    for i in range(count):
-        if not custom_spam_active:
-            break
-        
-        if CUSTOM_LINES:
-            line = random.choice(CUSTOM_LINES)
-        else:
-            line = "Spam message!"
-        
+    if not CUSTOM_LINES:
+        await client.send_message(chat_id, f"{mention} ⚠️ No custom lines found! Use !addline to add lines.")
+        custom_spam_active = False
+        return
+    
+    i = 0
+    retry_count = 0
+    max_retries = 5
+    
+    while i < count and custom_spam_active:
         try:
+            line = random.choice(CUSTOM_LINES)
             await client.send_message(chat_id, f"{mention} {line}")
-            await asyncio.sleep(0.15)  # FASTER - 0.15 seconds delay
+            i += 1
+            retry_count = 0
+            await asyncio.sleep(0)
+                
         except Exception as e:
-            print(f"Custom spam error: {e}")
-            break
+            error_str = str(e).lower()
+            
+            if "flood" in error_str or "too many" in error_str or "429" in error_str:
+                retry_count += 1
+                if retry_count > max_retries:
+                    await client.send_message(chat_id, f"❌ Rate limited! Stopped at {i}/{count}.")
+                    break
+                wait = retry_count
+                await client.send_message(chat_id, f"⚠️ Flood wait {wait}s... ({i}/{count})")
+                await asyncio.sleep(wait)
+            elif "bot was blocked" in error_str:
+                await client.send_message(chat_id, f"❌ Bot was blocked! Stopping.")
+                break
+            else:
+                print(f"Custom spam error: {e}")
+                await asyncio.sleep(1)
+    
+    if custom_spam_active and i > 0:
+        try:
+            await client.send_message(chat_id, f"✅ Done! Sent {i} messages.")
+        except:
+            pass
+    
+    custom_spam_active = False
 
 #=============== CUSTOM LINES SPAM COMMAND ================
 @app.on_message(filters.command("r", prefixes="!") & filters.group)
 async def custom_r_command(client, message: Message):
     global custom_spam_active, custom_spam_task
     
-    # Check sudo permission
     if not is_sudo(message.from_user.id):
-        await message.reply_text("❌ GAND MARA BSKD BADA AAYA SUDO USE KARNE WALA!")
+        await message.reply_text("❌ Not authorized!")
         return
     
-    # Check if replied to a user
     if not message.reply_to_message:
-        await message.reply_text("❌ KISI KO REPLY KARO OR USE KARO: !r <count>")
+        await message.reply_text("❌ Reply to a user first!\nUsage: !r 100")
         return
     
-    # Parse command
     parts = message.text.split()
     
     if len(parts) != 2:
-        await message.reply_text("❌ Usage: !r <count>\nExample: !r 10")
+        await message.reply_text("❌ Usage: !r <count>\nExample: !r 100\n\nMax: 10000")
         return
     
     try:
         count = int(parts[1])
-        
-        if count > 500:  # INCREASED LIMIT
-            await message.reply_text("❌ Max limit is 500!")
+        if count > 10000:
+            await message.reply_text("❌ Max limit is 10000!")
             return
-        
         if count < 1:
             await message.reply_text("❌ Count must be at least 1!")
             return
-            
     except ValueError:
-        await message.reply_text("❌ Invalid number! Please provide a valid count.")
+        await message.reply_text("❌ Invalid number!")
+        return
+    
+    if not CUSTOM_LINES:
+        await message.reply_text("❌ No custom lines! Use !addline to add.")
         return
     
     target_user = message.reply_to_message.from_user
     chat_id = message.chat.id
     
-    # Stop any existing spam
     if custom_spam_active:
         custom_spam_active = False
         if custom_spam_task:
             custom_spam_task.cancel()
         await asyncio.sleep(0.3)
     
-    # Start new spam
     custom_spam_active = True
     
-    # Send confirmation
     await message.reply_text(
-        f"✅ Custom lines spam started!\n"
+        f"✅ **RAID STARTED!**\n\n"
         f"🎯 Target: {target_user.first_name}\n"
         f"🔢 Count: {count}\n"
-        f"📝 Using {len(CUSTOM_LINES)} custom lines\n"
-        f"⚡ Use !stopr to stop!"
+        f"📝 Lines: {len(CUSTOM_LINES)}\n"
+        f"⚡ Speed: MAXIMUM\n"
+        f"🛑 Stop: !stopr"
     )
     
-    # Run spam in background
+    await message.delete()
+    
     custom_spam_task = asyncio.create_task(
         custom_spam_loop(client, chat_id, target_user.id, count)
     )
-    
-    # Wait for completion
-    try:
-        await custom_spam_task
-        if custom_spam_active:
-            await message.reply_text(f"✅ CHUDAI DONE! Sent {count} messages.")
-    except asyncio.CancelledError:
-        pass
-    finally:
-        custom_spam_active = False
 
 #=============== STOP CUSTOM SPAM ================
 @app.on_message(filters.command("stopr", prefixes="!") & filters.group)
@@ -318,56 +348,125 @@ async def stop_custom_spam(client, message: Message):
     global custom_spam_active, custom_spam_task
     
     if not is_sudo(message.from_user.id):
-        await message.reply_text("❌ USE KARNE KE BARE ME SOCHNA BHI MAT WARNA GAND MAR LUNGA!")
+        await message.reply_text("❌ Not authorized!")
         return
     
     if custom_spam_active:
         custom_spam_active = False
         if custom_spam_task:
             custom_spam_task.cancel()
-        await message.reply_text("🛑 HO GEYA KAM BOSS!")
+        await message.reply_text("🛑 **RAID STOPPED!**")
+        await message.delete()
     else:
-        await message.reply_text("⚠️ No active custom lines spam to stop!")
+        await message.reply_text("⚠️ No active raid!")
+        await message.delete()
+
+#=============== ADD CUSTOM LINE ================
+@app.on_message(filters.command("addline", prefixes="!") & filters.private)
+async def add_line_command(client, message: Message):
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ Only owner can add lines!")
+        return
+    
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.reply_text("❌ Usage: !addline <your text line>")
+        return
+    
+    new_line = parts[1]
+    CUSTOM_LINES.append(new_line)
+    save_custom_lines()
+    
+    await message.reply_text(f"✅ Line added!\nTotal lines: {len(CUSTOM_LINES)}\n\nLine: {new_line[:100]}")
+
+#=============== REMOVE LINE ================
+@app.on_message(filters.command("removeline", prefixes="!") & filters.private)
+async def remove_line_command(client, message: Message):
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ Only owner can remove lines!")
+        return
+    
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.reply_text("❌ Usage: !removeline <line_number>")
+        return
+    
+    try:
+        line_num = int(parts[1]) - 1
+        if 0 <= line_num < len(CUSTOM_LINES):
+            removed = CUSTOM_LINES.pop(line_num)
+            save_custom_lines()
+            await message.reply_text(f"✅ Removed line {line_num+1}: {removed[:100]}")
+        else:
+            await message.reply_text(f"❌ Line number out of range! (1-{len(CUSTOM_LINES)})")
+    except ValueError:
+        await message.reply_text("❌ Invalid line number!")
+
+#=============== VIEW LINES ================
+@app.on_message(filters.command("lines", prefixes="!") & filters.private)
+async def view_lines_command(client, message: Message):
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ Only owner can view lines!")
+        return
+    
+    if not CUSTOM_LINES:
+        await message.reply_text("📝 No custom lines found!\nUse !addline to add.")
+        return
+    
+    lines_text = f"📝 **Custom Lines (Total: {len(CUSTOM_LINES)})**\n\n"
+    for i, line in enumerate(CUSTOM_LINES[:50], 1):
+        lines_text += f"{i}. {line[:80]}\n"
+    
+    if len(CUSTOM_LINES) > 50:
+        lines_text += f"\n... and {len(CUSTOM_LINES)-50} more"
+    
+    await message.reply_text(lines_text)
 
 #=============== START COMMAND ================
 @app.on_message(filters.command("start"))
 async def start_command(client, message: Message):
     user = message.from_user
-
     await message.reply_text(
         f"🔥 Welcome {user.first_name}! 🔥\n\n"
-        f"I'm a powerful group management bot.\n\n"
-        f"Use buttons below to explore!",
+        f"💪 Powerful Raid Bot\n\n"
+        f"**Data Persistence:** ✅ Enabled\n"
+        f"**Lines Saved:** {len(CUSTOM_LINES)}\n"
+        f"**Sudo Users:** {len(sudo_users)}\n\n"
+        f"Use buttons below!",
         reply_markup=get_main_keyboard()
     )
 
-#=============== BUTTON CALLBACK HANDLER ================
+#=============== BUTTON CALLBACK ================
 @app.on_callback_query()
 async def button_callback(client, callback_query):
     data = callback_query.data
 
     if data == "help":
-        help_text = """
-🤖 BOT COMMANDS 🤖
+        help_text = f"""
+🤖 **BOT COMMANDS** 🤖
 
-📊 Utility:
+📊 **Utility:**
 • !alive - Check bot status
 • !ping - Check bot speed
-• !speed - Bot response time
 
-⚡ Sudo Commands:
-• !spam - Spam user with custom message
-• !stopspam - Stop custom spam
-• !r <count> - Send random custom lines to replied user
-• !stopr - Stop custom lines spam
+⚡ **Raid Commands (Sudo only):**
+• !r <count> - Raid user with custom lines
+• !stopr - Stop active raid
+
+👑 **Owner Commands (Private Chat):**
+• !addline <text> - Add custom line (SAVED)
+• !removeline <num> - Remove line
+• !lines - View all lines
 • !add - Add sudo user
 • !remove - Remove sudo user
-
-👑 Owner Only:
-• !removesudo - Remove sudo user
 • !sudolist - List sudo users
 
-💫 Custom Lines Active: {len(CUSTOM_LINES)} lines
+💾 **Data Persistence:**
+• All data auto-saves to files
+• Survives bot restarts
+• Survives Render resets
+
+💫 **Custom Lines:** {len(CUSTOM_LINES)}
 """
 
         await callback_query.message.edit_text(
@@ -379,18 +478,18 @@ async def button_callback(client, callback_query):
 
     elif data == "back":
         await callback_query.message.edit_text(
-            "🔥 Welcome Back! 🔥\n\nUse buttons below to explore!",
+            "🔥 Welcome Back! 🔥\n\nData is safely saved!",
             reply_markup=get_main_keyboard()
         )
 
     elif data == "home":
         await callback_query.message.edit_text(
-            f"🏠 My Home\n\n"
+            f"🏠 **My Home**\n\n"
             f"📊 Bot Stats:\n"
             f"• Sudo Users: {len(sudo_users)}\n"
-            f"• Stickers: {len(custom_stickers)}\n"
             f"• Custom Lines: {len(CUSTOM_LINES)}\n"
-            f"• Status: Active 🟢\n\n"
+            f"• Status: Active 🟢\n"
+            f"• Data Persistence: ✅ ON\n\n"
             f"👑 Owner: {OWNER_ID}",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 Back", callback_data="back")]
@@ -399,176 +498,74 @@ async def button_callback(client, callback_query):
 
     await callback_query.answer()
 
-#=============== UTILITY COMMANDS (FASTER) ================
+#=============== UTILITY COMMANDS ================
 @app.on_message(filters.command("alive", prefixes="!") & filters.group)
 async def alive_command(client, message: Message):
     await message.reply_text("✅ Bot is Online! 🚀")
-
 
 @app.on_message(filters.command("ping", prefixes="!") & filters.group)
 async def ping_command(client, message: Message):
     start = time.time()
     msg = await message.reply_text("🏓 Pinging...")
     end = time.time()
-
     ping_time = round((end - start) * 1000)
-
     await msg.edit_text(f"🏓 Pong!\n⏱️ {ping_time}ms")
-
-
-@app.on_message(filters.command("speed", prefixes="!") & filters.group)
-async def speed_command(client, message: Message):
-    start = time.time()
-    msg = await message.reply_text("⚡ Checking speed...")
-    end = time.time()
-
-    response_time = round((end - start) * 1000)
-
-    await msg.edit_text(
-        f"⚡ Bot Speed\n📡 Response Time: {response_time}ms\n🚀 Status: Super Fast!"
-    )
 
 #=============== SUDO CHECK ================
 def is_sudo(user_id):
     return user_id in sudo_users
 
-#=============== SPAM COMMAND (FASTER) ================
-@app.on_message(filters.command("spam", prefixes="!") & filters.group)
-async def spam_command(client, message: Message):
-
-    if not is_sudo(message.from_user.id):
-        await message.reply_text("❌ PEHELE SUPREME KO PAPA BOL!")
-        return
-
-    if not message.reply_to_message:
-        await message.reply_text("❌ Reply to a user and use: !spam <count> <message>")
-        return
-
-    parts = message.text.split(" ", 2)
-
-    if len(parts) < 3:
-        await message.reply_text("❌ Usage: !spam <count> <message>")
-        return
-
-    try:
-        count = int(parts[1])
-
-        if count > 500:  # INCREASED LIMIT
-            await message.reply_text("❌ Max limit is 500!")
-            return
-
-    except:
-        await message.reply_text("❌ Invalid number!")
-        return
-
-    global spam_active
-
-    target = message.reply_to_message.from_user
-    mention = target.mention
-    custom_text = parts[2]
-
-    spam_active = True
-
-    for i in range(count):
-        if not spam_active:
-            break
-
-        await message.reply_text(f"{mention} {custom_text}")
-
-        await asyncio.sleep(0.1)  # FASTER
-
-    spam_active = False
-
-    await message.reply_text(f"✅ Spam completed: {count} times!")
-
-#=============== STOP SPAM ================
-@app.on_message(filters.command("stopspam", prefixes="!") & filters.group)
-async def stop_spam_command(client, message: Message):
-
-    if not is_sudo(message.from_user.id):
-        await message.reply_text("❌ SUPREME PAPA SE SUDO LEKE AA!")
-        return
-
-    global spam_active
-
-    spam_active = False
-
-    await message.reply_text("🛑 Spam stopped!")
-
 #=============== ADD SUDO ================
 @app.on_message(filters.command("add", prefixes="!") & filters.group)
 async def add_sudo_command(client, message: Message):
-
     if message.from_user.id != OWNER_ID:
         await message.reply_text("❌ Only owner can add sudo users!")
         return
 
     user_id = None
-
     if message.reply_to_message:
         user_id = message.reply_to_message.from_user.id
-
     elif len(message.command) > 1:
         try:
             user_id = int(message.command[1])
-
         except:
             await message.reply_text("❌ Invalid user ID!")
             return
 
     if user_id:
         sudo_users.add(user_id)
-
-        save_data()
-
+        save_sudo_users()
         user = await client.get_users(user_id)
-
         await message.reply_text(f"✅ {user.first_name} added as sudo user!")
-
-    else:
-        await message.reply_text("❌ Reply to a user or provide user ID!")
+        await message.delete()
 
 #=============== REMOVE SUDO ================
 @app.on_message(filters.command("remove", prefixes="!") & filters.group)
 async def remove_sudo_command(client, message: Message):
-
     if message.from_user.id != OWNER_ID:
         await message.reply_text("❌ Only owner can remove sudo users!")
         return
 
     user_id = None
-
     if message.reply_to_message:
         user_id = message.reply_to_message.from_user.id
-
     elif len(message.command) > 1:
         try:
             user_id = int(message.command[1])
-
         except:
             await message.reply_text("❌ Invalid user ID!")
             return
 
     if user_id and user_id in sudo_users and user_id != OWNER_ID:
         sudo_users.remove(user_id)
-
-        save_data()
-
+        save_sudo_users()
         user = await client.get_users(user_id)
-
-        await message.reply_text(
-            f"✅ {user.first_name} removed from sudo users!"
-        )
-
-    else:
-        await message.reply_text(
-            "❌ User not found in sudo list or cannot remove owner!"
-        )
+        await message.reply_text(f"✅ {user.first_name} removed from sudo users!")
+        await message.delete()
 
 #=============== SUDO LIST ================
 @app.on_message(filters.command("sudolist", prefixes="!") & filters.group)
 async def sudo_list_command(client, message: Message):
-
     if not is_sudo(message.from_user.id):
         await message.reply_text("❌ Only sudo users can use this command!")
         return
@@ -577,23 +574,19 @@ async def sudo_list_command(client, message: Message):
         await message.reply_text("📝 No sudo users found!")
         return
 
-    sudo_list = "👑 Sudo Users List\n\n"
-
+    sudo_list = "👑 **Sudo Users List**\n\n"
     for user_id in sudo_users:
         try:
             user = await client.get_users(user_id)
-
-            sudo_list += f"• {user.first_name}\n ┗ ID: {user_id}\n"
-
+            sudo_list += f"• {user.first_name}\n ┗ ID: `{user_id}`\n"
         except:
-            sudo_list += f"• Unknown User\n ┗ ID: {user_id}\n"
+            sudo_list += f"• Unknown User\n ┗ ID: `{user_id}`\n"
 
     await message.reply_text(sudo_list)
 
 #=============== MESSAGE HANDLER ================
 @app.on_message(filters.group)
 async def message_handler(client, message: Message):
-
     try:
         if not message.from_user:
             return
@@ -604,55 +597,46 @@ async def message_handler(client, message: Message):
 
         if message.text:
             log_text += f"Text: {message.text[:100]}"
-
         elif message.sticker:
             log_text += "Sticker sent"
 
         print(log_text)
-
     except:
         pass
 
-    if not message.from_user:
-        return
-
-    user_id = message.from_user.id
-
-    # OWNER PROTECTION
-    if user_id == OWNER_ID:
-        return
-
-    # SUDO PROTECTION
-    if user_id in sudo_users:
-        return
-
-    # DELETE MUTED USER MESSAGE
-    if user_id in muted_users:
-        try:
-            await message.delete()
-
-        except:
-            pass
+#=============== SHUTDOWN HANDLER ================
+def shutdown_handler():
+    print("\n🛑 Shutting down... Saving data...")
+    save_all_data()
+    print("✅ Data saved! Goodbye!")
 
 #=============== MAIN ================
 def main():
-
-    load_data()
-
+    global CUSTOM_LINES
+    
+    load_all_data()
+    
     if OWNER_ID not in sudo_users:
         sudo_users.add(OWNER_ID)
-        save_data()
-
-    print("🚀 Bot Started Successfully!")
-    print("✅ All features loaded!")
-    print("📝 Check logs for group messages")
+        save_sudo_users()
+    
+    import atexit
+    atexit.register(shutdown_handler)
+    
+    print("=" * 60)
+    print("🚀 BOT STARTED SUCCESSFULLY!")
+    print("=" * 60)
+    print(f"✅ Data Persistence: ENABLED")
     print(f"👑 Owner ID: {OWNER_ID}")
     print(f"📊 Sudo Users: {len(sudo_users)}")
-    print(f"💫 Custom Lines Loaded: {len(CUSTOM_LINES)}")
-    print("⚡ Bot is 5X FASTER now!")
+    print(f"📝 Custom Lines: {len(CUSTOM_LINES)}")
+    print(f"⚡ Speed: MAXIMUM")
+    print("=" * 60)
+    print("💾 All data auto-saves to files!")
+    print("🔄 Data survives bot restarts and Render resets!")
+    print("=" * 60)
 
     app.run()
-
 
 if __name__ == "__main__":
     main()
